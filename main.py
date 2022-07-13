@@ -2,24 +2,21 @@ import requests
 import re
 import regex
 import keyboard
+import vlc
+import tkinter as tk
+import pymysql
+
 from animdl.core.cli.helpers.searcher import search_animixplay
 from animdl.core.cli.http_client import client
 from animdl.core.cli.helpers import ensure_extraction
-import time
-
 from animdl.core.codebase.providers import get_appropriate
-
-import vlc
-
-from tkinter import *
-import tkinter as tk
 
 session = client
 start_episode = 0
 
 
-def animdl_search(name):
-    nine_anime_results = search_animixplay(session, name)
+def animdl_search(anime_name):
+    nine_anime_results = search_animixplay(session, anime_name)
 
     search_results = [item for item in nine_anime_results]
 
@@ -71,11 +68,6 @@ class UserPrompt:
         # Beginning of Tkinter Stuff
         self.prompt = tk.Tk()
 
-        # Random
-        self.prompt.title('Anime Selector')
-        self.prompt.geometry("300x500")
-        tk.Label(self.prompt, text="Watch Anime", font=("Garamond Bold", 16)).place(x=20, y=5)
-
         # Option Menu Creation
         choices = ['One Piece', 'Naruto']
         self.menu_choice = tk.StringVar(self.prompt)
@@ -88,24 +80,28 @@ class UserPrompt:
 
         # Entry
         self.start_entry = tk.Entry(self.prompt, bd=8)
-        self.start_entry.place(x=50, y=70)
+        self.start_entry.place(x=40, y=60)
 
         self.end_entry = tk.Entry(self.prompt, bd=8)
-        self.end_entry.place(x=50, y=120)
+        self.end_entry.place(x=40, y=130)
 
         # Entry Labels
         tk.Label(self.prompt, text="Start Episode", font=("Times New Roman", 12)).place(x=40, y=35)
-        tk.Label(self.prompt, text="End Episode", font=("Times New Roman", 12)).place(x=40, y=85)
+        tk.Label(self.prompt, text="End Episode", font=("Times New Roman", 12)).place(x=40, y=100)
 
         # Button
         self.button = tk.Button(self.prompt, text="Start", command=self.start_button, width=12, height=3)
         self.button.place(x=200, y=100)
 
+        # Random
+        self.prompt.title('Anime Selector')
+        self.prompt.geometry("300x200")
+        tk.Label(self.prompt, text="Watch Anime", font=("Times Bold", 16)).place(x=20, y=5)
+
         # Main Loop
         self.prompt.mainloop()
 
         # Return a list of this format [anime choice, episode start, episode end]
-
 
     def start_button(self):
         print("meow")
@@ -119,7 +115,22 @@ def create_episode_string(start, end):
     return " ".join(episode_list)
 
 
+def get_episode_title_time(sql_cursor, ep_num):
+    stmt = """SELECT TitleTime FROM `OnePiece` WHERE EpNum = %s"""
+    sql_cursor.execute(stmt, str(ep_num))
+    result = sql_cursor.fetchone()
+    return result[0]
+
+
 if __name__ == '__main__':
+    print("Meow")
+    connection = pymysql.connect(host='sql3.freesqldatabase.com',
+                                 user='sql3506222',
+                                 password='lriqksrIhM',
+                                 database='sql3506222')
+    cursor = connection.cursor()
+    print(get_episode_title_time(cursor, 55))
+
     # Call class
     user = UserPrompt()
 
@@ -145,7 +156,7 @@ if __name__ == '__main__':
                 stream_links[episode] = split_urls[i + 1]
                 break
 
-    print(stream_links[398])
+    print(stream_links)
     meow = requests.get(stream_links[398])
     print(meow.headers.get('content-type'))
 
@@ -161,3 +172,4 @@ if __name__ == '__main__':
             pause()
         if keyboard.is_pressed("esc"):
             playing = False
+
