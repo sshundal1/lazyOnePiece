@@ -1,12 +1,8 @@
-import click
-import animdl
-import logging
 import requests
 import re
 import regex
 import keyboard
-from animdl.core.cli.helpers.processors import process_query
-from animdl.core.cli.helpers.searcher import search_9anime, search_animepahe, search_allanime, search_animixplay
+from animdl.core.cli.helpers.searcher import search_animixplay
 from animdl.core.cli.http_client import client
 from animdl.core.cli.helpers import ensure_extraction
 import time
@@ -15,9 +11,11 @@ from animdl.core.codebase.providers import get_appropriate
 
 import vlc
 
+from tkinter import *
 import tkinter as tk
 
 session = client
+start_episode = 0
 
 
 def animdl_search(name):
@@ -62,15 +60,72 @@ def pause():
             media_player.play()
             break
 
-def user_prompt():
-    window = tk.Tk()
-    window.title('Anime Selector')
-    tk.Label(window, text="Suhhhh Dude", font=("Garamond Bold", 16)).place(x=70, y=5)
-    window.geometry("200x200")
-    window.mainloop()
+
+class UserPrompt:
+    def __init__(self):
+        # Initialization
+        self.episode_start_entry = None
+        self.episode_end_entry = None
+        self.anime = None
+
+        # Beginning of Tkinter Stuff
+        self.prompt = tk.Tk()
+
+        # Random
+        self.prompt.title('Anime Selector')
+        self.prompt.geometry("300x500")
+        tk.Label(self.prompt, text="Watch Anime", font=("Garamond Bold", 16)).place(x=20, y=5)
+
+        # Option Menu Creation
+        choices = ['One Piece', 'Naruto']
+        self.menu_choice = tk.StringVar(self.prompt)
+        self.menu_choice.set('One Piece')
+
+        self.menu = tk.OptionMenu(self.prompt, self.menu_choice, *choices)
+
+        # Option Menu Placement
+        self.menu.place(x=200, y=40)
+
+        # Entry
+        self.start_entry = tk.Entry(self.prompt, bd=8)
+        self.start_entry.place(x=50, y=70)
+
+        self.end_entry = tk.Entry(self.prompt, bd=8)
+        self.end_entry.place(x=50, y=120)
+
+        # Entry Labels
+        tk.Label(self.prompt, text="Start Episode", font=("Times New Roman", 12)).place(x=40, y=35)
+        tk.Label(self.prompt, text="End Episode", font=("Times New Roman", 12)).place(x=40, y=85)
+
+        # Button
+        self.button = tk.Button(self.prompt, text="Start", command=self.start_button, width=12, height=3)
+        self.button.place(x=200, y=100)
+
+        # Main Loop
+        self.prompt.mainloop()
+
+        # Return a list of this format [anime choice, episode start, episode end]
+
+
+    def start_button(self):
+        print("meow")
+        self.episode_start_entry = self.start_entry.get()
+        self.episode_end_entry = self.end_entry.get()
+        self.anime = self.menu_choice.get()
+
+
+def create_episode_string(start, end):
+    episode_list = [str(episode_number) for episode_number in range(start, end + 1, 1)]
+    return " ".join(episode_list)
+
 
 if __name__ == '__main__':
-    name = 'One Piece'
+    # Call class
+    user = UserPrompt()
+
+    # Define start values
+    name = user.anime
+    episodes = create_episode_string(int(user.episode_start_entry), int(user.episode_end_entry))
     results = animdl_search(name)
     stream_links = {}
 
@@ -79,7 +134,7 @@ if __name__ == '__main__':
             anime_url = result['anime_url']
 
     for stream_url_caller, episode in get_appropriate(session, anime_url,
-                                                      get_check("398 399 400 401 402 403 404 405")):
+                                                      get_check(episodes)):
         stream_url = list(ensure_extraction(session, stream_url_caller))
 
         all_stream_urls = requests.get(stream_url[-1]['stream_url']).text
@@ -96,7 +151,6 @@ if __name__ == '__main__':
 
     open('OnePieceEpisode398.m3u8', 'wb').write(meow.content)
 
-    user_prompt()
     media_player = vlc.MediaPlayer("OnePieceEpisode398.m3u8")
     playing = True
     media_player.play()
