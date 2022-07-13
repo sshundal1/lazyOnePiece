@@ -4,12 +4,18 @@ import logging
 import requests
 import re
 import regex
+import keyboard
 from animdl.core.cli.helpers.processors import process_query
 from animdl.core.cli.helpers.searcher import search_9anime, search_animepahe, search_allanime, search_animixplay
 from animdl.core.cli.http_client import client
 from animdl.core.cli.helpers import ensure_extraction
+import time
 
 from animdl.core.codebase.providers import get_appropriate
+
+import vlc
+
+import tkinter as tk
 
 session = client
 
@@ -48,6 +54,20 @@ def get_check(range_string):
     )
 
 
+# Keeps player paused until space is pressed again
+def pause():
+    media_player.pause()
+    while True:
+        if keyboard.is_pressed("p"):
+            media_player.play()
+            break
+
+def user_prompt():
+    window = tk.Tk()
+    window.title('Anime Selector')
+    tk.Label(window, text="Suhhhh Dude", font=("Garamond Bold", 16)).place(x=70, y=5)
+    window.geometry("200x200")
+    window.mainloop()
 
 if __name__ == '__main__':
     name = 'One Piece'
@@ -67,12 +87,23 @@ if __name__ == '__main__':
 
         for i in range(0, len(split_urls), 1):
             if re.findall(r"RESOLUTION=1920x1080", split_urls[i]):
-                stream_links[episode] = split_urls[i+1]
+                stream_links[episode] = split_urls[i + 1]
                 break
-
 
     print(stream_links[398])
     meow = requests.get(stream_links[398])
     print(meow.headers.get('content-type'))
 
     open('OnePieceEpisode398.m3u8', 'wb').write(meow.content)
+
+    user_prompt()
+    media_player = vlc.MediaPlayer("OnePieceEpisode398.m3u8")
+    playing = True
+    media_player.play()
+    media_player.toggle_fullscreen()
+    media_player.set_time(280000)
+    while playing:
+        if keyboard.is_pressed("space"):
+            pause()
+        if keyboard.is_pressed("esc"):
+            playing = False
