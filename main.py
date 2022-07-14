@@ -5,17 +5,18 @@ import keyboard
 import vlc
 import tkinter as tk
 import pymysql
+import animdl
+import time
 
 from animdl.core.cli.helpers.searcher import search_animixplay
 from animdl.core.cli.http_client import client
 from animdl.core.cli.helpers import ensure_extraction
 from animdl.core.codebase.providers import get_appropriate
 
-session = client
 start_episode = 0
 
 
-def animdl_search(anime_name):
+def animixplay_search(anime_name):
     nine_anime_results = search_animixplay(session, anime_name)
 
     search_results = [item for item in nine_anime_results]
@@ -108,6 +109,7 @@ class UserPrompt:
         self.episode_start_entry = self.start_entry.get()
         self.episode_end_entry = self.end_entry.get()
         self.anime = self.menu_choice.get()
+        self.prompt.quit()
 
 
 def create_episode_string(start, end):
@@ -122,14 +124,28 @@ def get_episode_title_time(sql_cursor, ep_num):
     return result[0]
 
 
+def minutes_seconds_to_seconds(time_str):
+    m, s = time_str.split(':')
+    return int(m)*60 + int(s)
+
+def seconds_to_minutes_seconds(input_time):
+    m = int(input_time) // 60
+    s = int(input_time) % 60
+    print("Meow")
+    print(input_time)
+    print(m)
+    print(s)
+    return str(m) + ":" + str(s)
+
+
 if __name__ == '__main__':
+    session = client
     print("Meow")
     connection = pymysql.connect(host='sql3.freesqldatabase.com',
                                  user='sql3506222',
                                  password='lriqksrIhM',
                                  database='sql3506222')
     cursor = connection.cursor()
-    print(get_episode_title_time(cursor, 55))
 
     # Call class
     user = UserPrompt()
@@ -137,14 +153,16 @@ if __name__ == '__main__':
     # Define start values
     name = user.anime
     episodes = create_episode_string(int(user.episode_start_entry), int(user.episode_end_entry))
-    results = animdl_search(name)
-    stream_links = {}
+    results = animixplay_search(name)
+    stream_names = {}
 
     for result in results:
         if result['name'] == name:
             anime_url = result['anime_url']
 
-    for stream_url_caller, episode in get_appropriate(session, anime_url,
+    print(anime_url)
+    print(episodes)
+    for stream_url_caller, episode in get_appropriate(session, 'https://animixplay.to/v1/one-piece',
                                                       get_check(episodes)):
         stream_url = list(ensure_extraction(session, stream_url_caller))
 
@@ -153,23 +171,90 @@ if __name__ == '__main__':
 
         for i in range(0, len(split_urls), 1):
             if re.findall(r"RESOLUTION=1920x1080", split_urls[i]):
-                stream_links[episode] = split_urls[i + 1]
+                episode_name = name + " " + str(episode) + ".m3u8"
+                stream_names[episode] = episode_name
+                grabbed_ep = requests.get(split_urls[i + 1])
+                open(episode_name, 'wb').write(grabbed_ep.content)
                 break
 
-    print(stream_links)
-    meow = requests.get(stream_links[398])
-    print(meow.headers.get('content-type'))
+    for key in stream_names:
+        print(key)
 
-    open('OnePieceEpisode398.m3u8', 'wb').write(meow.content)
+    for item in stream_names.items():
+        print(item)
 
-    media_player = vlc.MediaPlayer("OnePieceEpisode398.m3u8")
-    playing = True
-    media_player.play()
-    media_player.toggle_fullscreen()
-    media_player.set_time(280000)
-    while playing:
-        if keyboard.is_pressed("space"):
-            pause()
-        if keyboard.is_pressed("esc"):
-            playing = False
+    '''
+    # VLC initializtion
+    media_player = vlc.MediaListPlayer()
+    player = vlc.Instance()
+    # media list
+    media_list = player.media_list_new()
+    # adding episodes to a queue
+    for episode, episode_name in stream_names.items():
+        media = player.media_new(episode_name)
+        media_player.set_media_list(media_list)
+        
+    '''
+    exit_video = False
+    for episode, episode_name in stream_names.items():
+        media_player = vlc.MediaPlayer(episode_name)
+        playing = True
+        play_state = True
+        time_showing = False
+        media_player.play()
+        media_player.toggle_fullscreen()
+        media_player.set_time(minutes_seconds_to_seconds(get_episode_title_time(cursor, episode))*1000)
+        while playing:
+            if keyboard.is_pressed("space"):
+                if play_state:
+                    media_player.pause()
+                    play_state = False
+                    time.sleep(.5)
+                else:
+                    media_player.play()
+                    play_state = True
+                    time.sleep(.5)
+            if keyboard.is_pressed("esc"):
+                media_player.pause()
+                media_player.stop()
+                playing = False
+                exit_video = True
+                time.sleep(.5)
+                break
+            if keyboard.is_pressed("n"):
+                media_player.pause()
+                media_player.stop()
+                playing = False
+                time.sleep(.5)
+            if keyboard.is_pressed("t"):
+                time_showing = True
+                cur_time = seconds_to_minutes_seconds(media_player.get_time()/1000)
+                media_player.video_set_marquee_int(vlc.VideoMarqueeOption.Enable, 1)
+                media_player.video_set_marquee_int(vlc.VideoMarqueeOption.Size, 30)  # pixels
+                media_player.video_set_marquee_int(vlc.VideoMarqueeOption.Position, 6)
+                media_player.video_set_marquee_string(vlc.VideoMarqueeOption.Text, vlc.str_to_bytes(cur_time))
+                media_player.toggle_teletext()
+                time.sleep(.5)
+            if keyboard.is_pressed("c"):
+                media_player.video_set_marquee_string(vlc.VideoMarqueeOption.Text, vlc.str_to_bytes(None))
+                media_player.toggle_teletext()
+                time.sleep(.5)
+            if keyboard.is_pressed("left"):
+                media_player.set_time(media_player.get_time()-5000)
+                time.sleep(.5)
+            if keyboard.is_pressed("right"):
+                media_player.set_time(media_player.get_time()+5000)
+                time.sleep(.5)
+            if keyboard.is_pressed("up"):
+                media_player.set_time(media_player.get_time()+1)
+                time.sleep(.2)
+        if time_showing:
+            cur_time = seconds_to_minutes_seconds(media_player.get_time() / 1000)
+            media_player.video_set_marquee_string(vlc.VideoMarqueeOption.Text, vlc.str_to_bytes(cur_time))
+        if exit_video:
+            break
 
+'''
+python -m pip install -r requirements.txt
+python main.py
+'''
